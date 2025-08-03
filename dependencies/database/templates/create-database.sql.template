@@ -20,8 +20,8 @@ CREATE DATABASE "go-labs-{{ENV}}"
     TEMPLATE = template0;
 {% endif %}
 {% if ENV != 'tst' %}
--- {{ENV_DESCRIPTION}}: Creating database only if it doesn't exist
-CREATE DATABASE IF NOT EXISTS "go-labs-{{ENV}}"
+-- {{ENV_DESCRIPTION}}: Creating database (will error if exists, but that's expected)
+CREATE DATABASE "go-labs-{{ENV}}"
     WITH 
     OWNER = postgres
     ENCODING = 'UTF8'
