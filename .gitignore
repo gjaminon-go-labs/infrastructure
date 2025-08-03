@@ -1,0 +1,17 @@
+# Generated output files and logs
+output/
+logs/
+
+# Environment-specific password files
+dependencies/database/config/.env.*
+!dependencies/database/config/.env.template
+
+# Temporary files
+*.tmp
+*.swp
+*.backup
+*.bak
+
+# OS files
+.DS_Store
+Thumbs.db

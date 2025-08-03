@@ -1,0 +1,55 @@
+-- Database creation script for go-labs-{{ENV}}
+-- Generated from template for environment: {{ENV}}
+-- Date: {{TIMESTAMP}}
+
+-- Only drop database for test environment to ensure clean state
+{% if ENV == 'tst' %}
+-- TEST ENVIRONMENT: Dropping existing database for clean state
+DROP DATABASE IF EXISTS "go-labs-{{ENV}}";
+DROP DATABASE IF EXISTS "go_labs_{{ENV}}"; -- Also drop underscore version if exists
+{% endif %}
+
+-- Create application database
+{% if ENV == 'tst' %}
+-- TEST ENVIRONMENT: Creating fresh database
+CREATE DATABASE "go-labs-{{ENV}}"
+    WITH 
+    OWNER = postgres
+    ENCODING = 'UTF8'
+    CONNECTION LIMIT = -1
+    TEMPLATE = template0;
+{% endif %}
+{% if ENV != 'tst' %}
+-- {{ENV_DESCRIPTION}}: Creating database only if it doesn't exist
+CREATE DATABASE IF NOT EXISTS "go-labs-{{ENV}}"
+    WITH 
+    OWNER = postgres
+    ENCODING = 'UTF8'
+    CONNECTION LIMIT = -1
+    TEMPLATE = template0;
+{% endif %}
+
+-- Add comment to identify the database
+COMMENT ON DATABASE "go-labs-{{ENV}}" IS 'Go Labs application database for {{ENV_DESCRIPTION}}';
+
+-- Connect to the new database for initial setup
+\c "go-labs-{{ENV}}"
+
+-- Ensure we're using UTF-8
+SET client_encoding = 'UTF8';
+
+-- Create a version tracking table for the database itself
+CREATE TABLE IF NOT EXISTS database_info (
+    key VARCHAR(50) PRIMARY KEY,
+    value TEXT NOT NULL,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Insert database version and environment info
+INSERT INTO database_info (key, value) VALUES 
+    ('environment', '{{ENV}}'),
+    ('created_at', '{{TIMESTAMP}}'),
+    ('schema_version', '1.0.0')
+ON CONFLICT (key) DO UPDATE 
+    SET value = EXCLUDED.value,
+        updated_at = CURRENT_TIMESTAMP;

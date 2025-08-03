@@ -216,7 +216,88 @@ Final Configuration =
 - [ ] Security policies implementation
 - [ ] CI/CD integration
 
-## Getting Started
+## Local Development Setup
+
+### PostgreSQL Installation (RHEL9)
+
+For local development and testing, you'll need PostgreSQL installed. This repository includes an automated installation script for RHEL9 systems.
+
+#### Prerequisites
+- RHEL9 system with sudo access
+- Active Red Hat subscription (for package installation)
+
+#### PostgreSQL 16 Installation
+```bash
+# Navigate to infrastructure directory
+cd infrastructure
+
+# Run the PostgreSQL 16 installation script
+sudo ./scripts/install-postgresql16.sh
+
+# Check installation logs
+tail -f logs/postgresql16-install-*.log
+```
+
+**What the script does:**
+- ✅ Removes existing PostgreSQL 13 (if present)
+- ✅ Enables PostgreSQL 16 module from Red Hat official repositories
+- ✅ Installs PostgreSQL 16 server, client, and contrib packages
+- ✅ Initializes database cluster
+- ✅ Configures password authentication (username: `postgres`, password: `postgres`)
+- ✅ Configures remote access (listens on all interfaces)
+- ✅ Configures firewall to allow PostgreSQL connections (port 5432)
+- ✅ Creates development databases: `billing_service_dev`, `billing_service_test`
+- ✅ Validates installation and connectivity (local and remote)
+- ✅ Comprehensive logging for troubleshooting
+
+**Post-installation verification:**
+```bash
+# Check PostgreSQL version
+psql --version
+
+# Check service status
+sudo systemctl status postgresql
+
+# Connect to database with password
+PGPASSWORD=postgres psql -h localhost -U postgres
+
+# List databases (should include billing_service_dev and billing_service_test)
+PGPASSWORD=postgres psql -h localhost -U postgres -l
+
+# Test development database connections
+PGPASSWORD=postgres psql -h localhost -U postgres -d billing_service_dev -c "SELECT 1;"
+PGPASSWORD=postgres psql -h localhost -U postgres -d billing_service_test -c "SELECT 1;"
+
+# Test remote connectivity (replace <server-ip> with actual IP)
+PGPASSWORD=postgres psql -h <server-ip> -U postgres -d billing_service_test -c "SELECT 1;"
+
+# Check firewall status
+sudo firewall-cmd --list-all | grep postgresql
+```
+
+#### Logs and Troubleshooting
+All installation steps are logged to `infrastructure/logs/postgresql16-install-TIMESTAMP.log`. If installation fails:
+
+1. Check the log file for detailed error messages
+2. Ensure RHEL9 system has active subscription
+3. Verify sudo access and permissions
+4. Re-run the script (it's idempotent)
+
+#### Integration with Billing API
+After PostgreSQL installation, test the billing-api integration:
+
+```bash
+# Navigate to billing-api
+cd ../billing-api
+
+# Run integration tests (should now work with local PostgreSQL)
+make test-integration
+
+# Run all tests
+make test-all
+```
+
+## Getting Started with Kubernetes Deployment
 *To be implemented*
 
 ## Contributing

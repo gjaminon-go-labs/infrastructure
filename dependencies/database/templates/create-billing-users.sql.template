@@ -1,0 +1,116 @@
+-- Billing service user creation for go-labs-{{ENV}}
+-- Generated from template for environment: {{ENV}}
+-- Date: {{TIMESTAMP}}
+
+-- Connect to admin database first for user creation
+\c postgres
+
+-- Drop users only in test environment for clean state
+{% if ENV == 'tst' %}
+-- TEST ENVIRONMENT: Dropping existing billing users
+DROP USER IF EXISTS billing_migration_{{ENV}}_user;
+DROP USER IF EXISTS billing_app_{{ENV}}_user;
+{% endif %}
+
+-- Create billing migration user (DDL privileges)
+DO $$
+BEGIN
+    IF NOT EXISTS (SELECT FROM pg_user WHERE usename = 'billing_migration_{{ENV}}_user') THEN
+        CREATE USER billing_migration_{{ENV}}_user WITH PASSWORD '{{BILLING_MIGRATION_PASSWORD}}';
+        RAISE NOTICE 'Created user: billing_migration_{{ENV}}_user';
+    ELSE
+        -- Update password in case it changed
+        ALTER USER billing_migration_{{ENV}}_user WITH PASSWORD '{{BILLING_MIGRATION_PASSWORD}}';
+        RAISE NOTICE 'Updated password for: billing_migration_{{ENV}}_user';
+    END IF;
+END
+$$;
+
+-- Create billing application user (DML privileges only)
+DO $$
+BEGIN
+    IF NOT EXISTS (SELECT FROM pg_user WHERE usename = 'billing_app_{{ENV}}_user') THEN
+        CREATE USER billing_app_{{ENV}}_user WITH PASSWORD '{{BILLING_APP_PASSWORD}}';
+        RAISE NOTICE 'Created user: billing_app_{{ENV}}_user';
+    ELSE
+        -- Update password in case it changed
+        ALTER USER billing_app_{{ENV}}_user WITH PASSWORD '{{BILLING_APP_PASSWORD}}';
+        RAISE NOTICE 'Updated password for: billing_app_{{ENV}}_user';
+    END IF;
+END
+$$;
+
+-- Set user properties
+ALTER USER billing_migration_{{ENV}}_user 
+    CONNECTION LIMIT 10  -- Limited connections for migration user
+    VALID UNTIL 'infinity';
+
+ALTER USER billing_app_{{ENV}}_user 
+    CONNECTION LIMIT 50  -- More connections for app user
+    VALID UNTIL 'infinity';
+
+-- Add comments to identify users
+COMMENT ON ROLE billing_migration_{{ENV}}_user IS 'Billing service migration user for {{ENV}} - Full DDL privileges on billing schema';
+COMMENT ON ROLE billing_app_{{ENV}}_user IS 'Billing service application user for {{ENV}} - DML only on billing schema';
+
+-- Connect to application database for schema setup
+\c "go-labs-{{ENV}}"
+
+-- Drop schema only in test environment
+{% if ENV == 'tst' %}
+-- TEST ENVIRONMENT: Dropping existing billing schema
+DROP SCHEMA IF EXISTS billing CASCADE;
+{% endif %}
+
+-- Create billing schema owned by migration user
+CREATE SCHEMA IF NOT EXISTS billing AUTHORIZATION billing_migration_{{ENV}}_user;
+COMMENT ON SCHEMA billing IS 'Billing service schema for {{ENV}} environment';
+
+-- Grant usage on billing schema to app user
+GRANT USAGE ON SCHEMA billing TO billing_app_{{ENV}}_user;
+
+-- Set default privileges for tables created by migration user
+ALTER DEFAULT PRIVILEGES FOR USER billing_migration_{{ENV}}_user IN SCHEMA billing 
+    GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO billing_app_{{ENV}}_user;
+
+-- Set default privileges for sequences created by migration user
+ALTER DEFAULT PRIVILEGES FOR USER billing_migration_{{ENV}}_user IN SCHEMA billing 
+    GRANT USAGE, SELECT ON SEQUENCES TO billing_app_{{ENV}}_user;
+
+-- Revoke all privileges on public schema from billing users (security)
+REVOKE ALL ON SCHEMA public FROM billing_migration_{{ENV}}_user;
+REVOKE ALL ON SCHEMA public FROM billing_app_{{ENV}}_user;
+
+-- Create a test table to verify permissions work correctly
+SET ROLE billing_migration_{{ENV}}_user;
+CREATE TABLE IF NOT EXISTS billing.permission_test (
+    id SERIAL PRIMARY KEY,
+    test_value TEXT
+);
+
+-- Reset role
+RESET ROLE;
+
+-- Test that app user can access the table
+SET ROLE billing_app_{{ENV}}_user;
+-- This should succeed
+INSERT INTO billing.permission_test (test_value) VALUES ('Permission test successful');
+
+-- Reset role
+RESET ROLE;
+
+-- Clean up test table
+DROP TABLE IF EXISTS billing.permission_test;
+
+-- Summary of created resources
+DO $$
+BEGIN
+    RAISE NOTICE '';
+    RAISE NOTICE '=== Billing Service Setup Complete for {{ENV}} ===';
+    RAISE NOTICE 'Database: go-labs-{{ENV}}';
+    RAISE NOTICE 'Schema: billing';
+    RAISE NOTICE 'Migration User: billing_migration_{{ENV}}_user (DDL privileges)';
+    RAISE NOTICE 'Application User: billing_app_{{ENV}}_user (DML only)';
+    RAISE NOTICE '================================================';
+END
+$$;
