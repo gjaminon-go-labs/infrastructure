@@ -1,6 +1,7 @@
 # Ignore all environment-specific password files
 .env.*
 !.env.template
+!.env.ci  # Allow CI environment file for automated testing
 
 # Ignore any backup files
 *.backup
